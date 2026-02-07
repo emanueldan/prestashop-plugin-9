@@ -21,7 +21,22 @@ include(dirname(__FILE__) . '/classes/SamedayAwbParcel.php');
 include(dirname(__FILE__) . '/classes/SamedayConstants.php');
 include(dirname(__FILE__) . '/classes/SamedayPersistenceDataHandler.php');
 
-if (Tools::substr(Tools::encrypt(Configuration::get('SAMEDAY_CRON_TOKEN')), 0, 10) != Tools::getValue('token') ||
+if (!function_exists('samedayTokenHash')) {
+    function samedayTokenHash($token)
+    {
+        if (method_exists('Tools', 'encrypt')) {
+            return Tools::substr((string) Tools::encrypt($token), 0, 10);
+        }
+
+        if (method_exists('Tools', 'hash')) {
+            return Tools::substr((string) Tools::hash($token), 0, 10);
+        }
+
+        return substr(hash('sha256', (string) $token), 0, 10);
+    }
+}
+
+if (samedayTokenHash(Configuration::get('SAMEDAY_CRON_TOKEN')) != Tools::getValue('token') ||
     !Module::isInstalled('samedaycourier')
 ) {
     die('Bad token');

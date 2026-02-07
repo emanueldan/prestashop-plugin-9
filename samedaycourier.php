@@ -88,6 +88,18 @@ class SamedayCourier extends CarrierModule
             'locker_options_selector' => 'checkout_lockers_selector.v17.tpl',
             'open_package_option' => 'checkout_open_package.v17.tpl',
             'bgn_conversion_label' => 'bgn_conversion_label.v17.tpl',
+        ],
+        '8' => [
+            'locker_options_map' => 'checkout_lockers.v17.tpl',
+            'locker_options_selector' => 'checkout_lockers_selector.v17.tpl',
+            'open_package_option' => 'checkout_open_package.v17.tpl',
+            'bgn_conversion_label' => 'bgn_conversion_label.v17.tpl',
+        ],
+        '9' => [
+            'locker_options_map' => 'checkout_lockers.v17.tpl',
+            'locker_options_selector' => 'checkout_lockers_selector.v17.tpl',
+            'open_package_option' => 'checkout_open_package.v17.tpl',
+            'bgn_conversion_label' => 'bgn_conversion_label.v17.tpl',
         ]
     ];
 
@@ -183,7 +195,7 @@ class SamedayCourier extends CarrierModule
         $this->name = 'samedaycourier';
         $this->tab = 'shipping_logistics';
 
-        $this->version = '1.8.5';
+        $this->version = '1.8.7';
         $this->author = 'Sameday Courier';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -199,9 +211,27 @@ class SamedayCourier extends CarrierModule
         $this->logger = new FileLogger(0);
         $this->logger->setFilename(__DIR__ . '/log/' . md5(date('Ymd')) . '_sameday.log');
         $this->messages = array();
-        $this->ajaxRoute = $this->baseUrl()._MODULE_DIR_.'samedaycourier/ajax.php?token=' . Tools::substr(Tools::encrypt(Configuration::get('SAMEDAY_CRON_TOKEN')), 0, 10);
+        $this->ajaxRoute = $this->baseUrl()._MODULE_DIR_.'samedaycourier/ajax.php?token=' . $this->getCronTokenHash();
         $this->generalHelper = new SamedayGeneralHelper();
         $this->samedayApiHelper = new SamedayApiHelper();
+    }
+
+    /**
+     * PrestaShop 9 removed Tools::encrypt(); keep compatibility with 1.6-9.x.
+     */
+    private function getCronTokenHash(): string
+    {
+        $token = (string) Configuration::get('SAMEDAY_CRON_TOKEN');
+
+        if (method_exists('Tools', 'encrypt')) {
+            return Tools::substr((string) Tools::encrypt($token), 0, 10);
+        }
+
+        if (method_exists('Tools', 'hash')) {
+            return Tools::substr((string) Tools::hash($token), 0, 10);
+        }
+
+        return substr(hash('sha256', $token), 0, 10);
     }
 
     private function getMajorVersion(): int
@@ -2048,15 +2078,33 @@ class SamedayCourier extends CarrierModule
      */
     public function hookDisplayCarrierExtraContent($params)
     {
-        $service = SamedayService::findByCarrierId($params['carrier']['id']);
+        $carrierId = null;
+        if (isset($params['carrier']['id'])) {
+            $carrierId = (int) $params['carrier']['id'];
+        } elseif (isset($params['carrier']->id)) {
+            $carrierId = (int) $params['carrier']->id;
+        }
+
+        if (!$carrierId) {
+            return '';
+        }
+
+        $service = SamedayService::findByCarrierId($carrierId);
         if (!$service) {
             return '';
+        }
+
+        $templateVersion = '1.7';
+        if ($this->getMajorVersion() >= 9) {
+            $templateVersion = '9';
+        } elseif ($this->getMajorVersion() >= 8) {
+            $templateVersion = '8';
         }
 
         return $this->displayCarrierExtraContent(
             $params,
             $service,
-            '1.7'
+            $templateVersion
         );
     }
 
@@ -2077,7 +2125,15 @@ class SamedayCourier extends CarrierModule
     )
     {
         $html = "";
-        $cart = new CartCore($params['cart']->id);
+        $cart = isset($params['cart']->id)
+            ? new CartCore((int) $params['cart']->id)
+            : $this->context->cart;
+
+        if (!$cart || !(int) $cart->id) {
+            return $html;
+        }
+
+        $cookie = $params['cookie'] ?? $this->context->cookie;
         if ($this->isServiceEligibleToLocker((string) $service['code'])) {
             $address = new AddressCore($cart->id_address_delivery);
             $stateName = StateCore::getNameById($address->id_state);
@@ -2108,10 +2164,10 @@ class SamedayCourier extends CarrierModule
                 $this->smarty->assign('lockers', $lockers);
             }
 
-            $this->smarty->assign('lockerId', $params['cookie']->samedaycourier_locker_id);
-            $this->smarty->assign('lockerName', $params['cookie']->samedaycourier_locker_name);
-            $this->smarty->assign('lockerAddress', $params['cookie']->samedaycourier_locker_address);
-            $this->smarty->assign('lockerOohType', $params['cookie']->samedaycourier_locker_ooh_type);
+            $this->smarty->assign('lockerId', $cookie->samedaycourier_locker_id ?? null);
+            $this->smarty->assign('lockerName', $cookie->samedaycourier_locker_name ?? null);
+            $this->smarty->assign('lockerAddress', $cookie->samedaycourier_locker_address ?? null);
+            $this->smarty->assign('lockerOohType', $cookie->samedaycourier_locker_ooh_type ?? null);
             $this->smarty->assign('idCart', $params['cart']->id);
             $this->smarty->assign('city', $address->city);
             $this->smarty->assign('county', $stateName);
