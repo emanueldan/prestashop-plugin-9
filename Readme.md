@@ -39,3 +39,25 @@ unzip -l samedaycourier.zip | head
 ```
 
 It must contain a top-level `samedaycourier/` folder and `samedaycourier/samedaycourier.php`.
+
+
+### If PrestaShop still says "not a valid module zip"
+
+Most common causes on PrestaShop 9.0.1:
+
+1. Wrong ZIP root (must be `samedaycourier/`, not `.build/samedaycourier/` or repository name).
+2. Uploading source ZIP instead of generated `samedaycourier.zip`.
+3. Missing PHP `curl` extension on the server (module install returns false when `curl` is unavailable).
+
+Quick checks:
+
+```bash
+unzip -l samedaycourier.zip | head
+```
+
+You should see entries like:
+
+```text
+samedaycourier/
+samedaycourier/samedaycourier.php
+```

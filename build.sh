@@ -33,7 +33,7 @@ if command -v zip >/dev/null 2>&1; then
   )
 elif command -v powershell.exe >/dev/null 2>&1; then
   powershell.exe -NoProfile -NonInteractive -Command \
-    "Compress-Archive -Path '${STAGING_DIR}/*' -DestinationPath '${PACKAGE_NAME}' -Force" >/dev/null
+    "Set-Location '${STAGING_ROOT}'; Compress-Archive -Path '${MODULE_NAME}' -DestinationPath '../${PACKAGE_NAME}' -Force" >/dev/null
 elif command -v python >/dev/null 2>&1; then
   python - <<'PY'
 import os, zipfile
@@ -58,19 +58,28 @@ else
 fi
 
 # Quick integrity checks for PrestaShop module upload expectations.
-if command -v unzip >/dev/null 2>&1; then
-  unzip -l "$PACKAGE_NAME" | grep -q "${MODULE_NAME}/samedaycourier.php"
-elif command -v python >/dev/null 2>&1; then
+if command -v python >/dev/null 2>&1; then
   python - <<'PY'
 import sys, zipfile
 package='samedaycourier.zip'
-needle='samedaycourier/samedaycourier.php'
+module='samedaycourier/'
+entry='samedaycourier/samedaycourier.php'
 with zipfile.ZipFile(package, 'r') as zf:
     names=set(zf.namelist())
-if needle not in names:
-    print(f'Missing {needle} in {package}', file=sys.stderr)
+if entry not in names:
+    print(f'Missing {entry} in {package}', file=sys.stderr)
+    sys.exit(1)
+# Guard against wrong root folders like .build/samedaycourier
+for name in names:
+    if name.startswith('.build/') or name.startswith('./'):
+        print(f'Invalid archive root entry: {name}', file=sys.stderr)
+        sys.exit(1)
+if not any(name.startswith(module) for name in names):
+    print(f'Archive does not contain top-level {module}', file=sys.stderr)
     sys.exit(1)
 PY
+elif command -v unzip >/dev/null 2>&1; then
+  unzip -l "$PACKAGE_NAME" | grep -q "${MODULE_NAME}/samedaycourier.php"
 else
   echo "Warning: cannot validate archive contents automatically (missing unzip and python)." >&2
 fi
