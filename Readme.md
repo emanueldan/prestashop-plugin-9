@@ -20,7 +20,7 @@ A source ZIP from this repository is wrapped in a repository folder name, so Pre
 ./build.sh
 ```
 
-> On Windows (Git Bash), this script now works without `rsync`.
+> On Windows (Git Bash), this script now works without `rsync` and can build using PowerShell when `zip` is missing.
 
 3. Upload the generated file:
 
